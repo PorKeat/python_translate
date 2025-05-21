@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@mastra/speech-murf": "^0.1.23",
+    "@mastra/voice-murf": "^0.1.18"
+  }
+}

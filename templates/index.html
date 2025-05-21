@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-Time Khmer Voiceover</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-white min-h-screen flex items-center justify-center">
+    <div class="max-w-4xl w-full mx-4 p-8 bg-white rounded-lg shadow-lg border border-black">
+      <h1 class="text-3xl font-bold text-black mb-4 text-center">
+        Real-Time English to Khmer Voiceover
+      </h1>
+      <p class="text-black mb-6 text-center">
+        Type English text to translate to Khmer and generate voiceovers with an English voice.
+      </p>
+      <div class="flex flex-col md:flex-row gap-8">
+        <!-- Input (Left) -->
+        <div class="flex-1">
+          <textarea
+            id="text_input"
+            rows="8"
+            class="mt-1 block w-full h-full pl-4 pt-4 rounded-md border border-black bg-white text-black shadow-sm focus:border-black focus:ring-0"
+            placeholder="Type your English text here..."
+          ></textarea>
+        </div>
+        <!-- Output (Right) -->
+        <div class="flex-1">
+          <div id="khmer_output" class="p-4 bg-white border border-black rounded-md">
+            <h3 class="text-lg font-semibold text-black mb-2">Khmer Translation</h3>
+            <p id="khmer_text" class="text-black">
+              Translation will appear here...
+            </p>
+          </div>
+          <button
+            id="generate_btn"
+            class="w-full mt-4 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-900 transition duration-200"
+            disabled
+          >
+            Generate Khmer Voiceover
+          </button>
+          <div id="audio_player" class="mt-4"></div>
+          <div id="message" class="hidden p-4 rounded-md mt-4"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const textInput = document.getElementById("text_input");
+      const khmerText = document.getElementById("khmer_text");
+      const messageDiv = document.getElementById("message");
+      const generateBtn = document.getElementById("generate_btn");
+      const audioPlayer = document.getElementById("audio_player");
+
+      // Debounce function to limit API calls
+      function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      }
+
+      // Update translation and trigger TTS
+      const updateTranslation = debounce(async (text) => {
+        if (!text.trim()) {
+          khmerText.textContent = "Translation will appear here...";
+          generateBtn.disabled = true;
+          return;
+        }
+        try {
+          const response = await fetch("/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          const data = await response.json();
+          khmerText.textContent = data.khmer_text || "Translation error";
+          generateBtn.disabled = !data.khmer_text;
+          showMessage(data.message, data.message_type);
+        } catch (error) {
+          showMessage("Error connecting to server", "error");
+        }
+      }, 500);
+
+      async function generateVoiceover() {
+        const khmer = khmerText.textContent;
+        if (!khmer || khmer === "Translation will appear here...") return;
+        
+        // Show loading state
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Generating...";
+        
+        try {
+          const response = await fetch("/generate_voiceover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ khmer_text: khmer }),
+          });
+          const data = await response.json();
+          
+          // Reset button
+          generateBtn.disabled = false;
+          generateBtn.textContent = "Generate Khmer Voiceover";
+          
+          if (data.message_type === "success") {
+            // If we have an audio player HTML, inject it
+            audioPlayer.innerHTML = data.message;
+          } else {
+            showMessage(data.message, data.message_type);
+          }
+        } catch (error) {
+          // Reset button
+          generateBtn.disabled = false;
+          generateBtn.textContent = "Generate Khmer Voiceover";
+          showMessage("Error generating voiceover", "error");
+        }
+      }
+
+      // Show message
+      function showMessage(message, type) {
+        if (!message) {
+          messageDiv.classList.add("hidden");
+          return;
+        }
+        
+        messageDiv.classList.remove(
+          "hidden",
+          "bg-green-100",
+          "bg-red-100",
+          "text-green-800",
+          "text-red-800"
+        );
+        messageDiv.classList.add(
+          type === "success" ? "bg-white" : "bg-white",
+          type === "success" ? "text-black" : "text-black",
+          "border",
+          "border-black"
+        );
+        messageDiv.innerHTML = message;
+      }
+
+      // Event listeners
+      textInput.addEventListener("input", () =>
+        updateTranslation(textInput.value)
+      );
+      generateBtn.addEventListener("click", generateVoiceover);
+    </script>
+  </body>
+</html>
